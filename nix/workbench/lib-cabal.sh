@@ -62,6 +62,10 @@ function cardano-tracer() {
                           cabal -v0 run   ${WB_FLAGS_CABAL} exe:cardano-tracer   -- ${WB_FLAGS_RTS} "$@"
 }
 
+function cardano-baldur() {
+                          cabal -v0 run   ${WB_FLAGS_CABAL} exe:my-project   -- ${WB_FLAGS_RTS} "$@"
+}
+
 function locli() {
     #cabal -v0 build ${WB_FLAGS_CABAL} exe:locli
     #set-git-rev \
@@ -78,4 +82,4 @@ function tx-generator() {
 
 export WB_MODE_CABAL=t
 
-export -f cardano-node cardano-profile cardano-topology cardano-tracer locli tx-generator
+export -f cardano-node cardano-baldur cardano-profile cardano-topology cardano-tracer locli tx-generator

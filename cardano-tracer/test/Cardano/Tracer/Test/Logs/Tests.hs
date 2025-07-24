@@ -11,13 +11,14 @@ import qualified Cardano.Logging.Types as Net
 import           Cardano.Tracer.Configuration
 import           Cardano.Tracer.Handlers.Logs.Utils (isItLog)
 import           Cardano.Tracer.MetaTrace
-import           Cardano.Tracer.Run (doRunCardanoTracer)
+import           Cardano.Tracer.Run (doRunCardanoTracer, cleanupCardanoTracer)
 import           Cardano.Tracer.Test.Forwarder
 import           Cardano.Tracer.Test.TestSetup
 import           Cardano.Tracer.Test.Utils
 import           Cardano.Tracer.Utils (applyBrake, initDataPointRequestors, initProtocolsBrake)
 
-import           Control.Concurrent.Async (withAsync, link)
+import           Control.Concurrent.Async
+-- import           Control.Concurrent.Async (withAsync, link)
 import           Data.List.Extra (notNull)
 import           Data.List.NonEmpty (NonEmpty ((:|)))
 import           Data.Traversable (for)
@@ -37,9 +38,7 @@ tests ts = localOption (QuickCheckTests 1) $ testGroup "Test.Logs"
   , testProperty ".json"                   do propRunInLogsStructure       ts (propLogs      ts ForMachine 100 60)
   , testProperty "multi, initiator socket" do propRunInLogsStructureLocal2 ts (propMultiInit ts ForMachine)
   , testProperty "multi, responder socket" do propRunInLogsStructureLocal  ts (propMultiResp ts ForMachine)
-
   , testProperty "multi, initiator, port" do propRunInLogsStructurePort2   ts (propMultiInit ts ForMachine)
-
   , testProperty "multi, responder, port" do propRunInLogsStructurePort    ts (propMultiResp ts ForMachine)
   ]
 

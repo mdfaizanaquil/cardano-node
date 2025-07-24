@@ -28,7 +28,7 @@ let
           configFile     = "config.json";
           metricsHelp    = "../../../cardano-tracer/configuration/metrics_help.json";
         } // optionalAttrs backend.useCabalRun {
-          executable     = "cardano-tracer";
+          executable     = "cardano-baldur";
         } // optionalAttrs profile.tracer.rtview {
           RTView         = {
             epHost = "127.0.0.1";
