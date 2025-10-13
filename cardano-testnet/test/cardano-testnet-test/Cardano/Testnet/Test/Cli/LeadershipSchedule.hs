@@ -22,6 +22,7 @@ import           Cardano.Testnet
 import           Prelude
 
 import           Control.Monad (void)
+import           Control.Monad.Trans.Resource (getInternalState)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson as J
 import qualified Data.Aeson.Encode.Pretty as Aeson
@@ -45,6 +46,7 @@ import           Testnet.Process.Run (execCli, execCli', mkExecConfig)
 import           Testnet.Property.Assert
 import           Testnet.Property.Util (decodeEraUTxO, integrationRetryWorkspace)
 import           Testnet.Runtime
+import           Testnet.Start.Cardano
 import           Testnet.Types
 
 import           Hedgehog (Property, (===))
@@ -256,8 +258,9 @@ hprop_leadershipSchedule = integrationRetryWorkspace 2 "leadership-schedule" $ \
       , "--operational-certificate-issue-counter-file", testSpoOperationalCertFp
       , "--out-file", testSpoOperationalCertFp
       ]
-
-  jsonBS <- Aeson.encodePretty . Aeson.Object <$> createConfigJson tempAbsPath sbe
+  r1 <- lift $ lift getInternalState 
+  jsonBS <- liftToIntegration r1 $
+    Aeson.encodePretty . Aeson.Object <$> createConfigJson tempAbsPath sbe
   H.lbsWriteFile (unFile configurationFile) jsonBS
   newNodePort <- H.randomPort testnetDefaultIpv4Address
   eRuntime <- runExceptT . retryOnAddressInUseError $

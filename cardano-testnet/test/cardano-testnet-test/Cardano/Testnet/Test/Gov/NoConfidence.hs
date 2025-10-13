@@ -21,6 +21,7 @@ import           Cardano.Testnet
 import           Prelude
 
 import           Control.Monad
+import           Control.Monad.Trans.Resource (getInternalState)
 import qualified Data.ByteString.Char8 as BSC
 import           Data.Default.Class
 import qualified Data.Map.Strict as Map
@@ -40,6 +41,7 @@ import qualified Testnet.Process.Cli.SPO as SPO
 import           Testnet.Process.Cli.Transaction
 import qualified Testnet.Process.Run as H
 import           Testnet.Property.Util (integrationWorkspace)
+import           Testnet.Start.Cardano (liftToIntegration)
 import           Testnet.Start.Types
 import           Testnet.Types
 
@@ -47,6 +49,7 @@ import           Hedgehog
 import qualified Hedgehog as H
 import qualified Hedgehog.Extras as H
 import qualified Hedgehog.Extras.Stock.IO.Network.Sprocket as IO
+
 
 -- | Execute me with:
 -- @DISABLE_RETRIES=1 cabal test cardano-testnet-test --test-options '-p "/Committee Motion Of No Confidence/"'@
@@ -101,18 +104,20 @@ hprop_gov_no_confidence = integrationWorkspace "no-confidence" $ \tempAbsBasePat
   let comKeyCred1 = L.KeyHashObj comKeyHash1
       committeeThreshold = unsafeBoundedRational 0.5
       committee = L.Committee (Map.fromList [(comKeyCred1, EpochNo 100)]) committeeThreshold
-
-  createTestnetEnv fastTestnetOptions genesisOptions def conf
+      
+  r1 <- lift $ lift getInternalState 
+  liftToIntegration r1 $ createTestnetEnv fastTestnetOptions genesisOptions def conf
 
   H.rewriteJsonFile (tempAbsBasePath' </> "conway-genesis.json") $
     \conwayGenesis -> conwayGenesis { L.cgCommittee = committee }
-
+  
+  r2 <- lift $ lift getInternalState 
   TestnetRuntime
     { testnetMagic
     , testnetNodes
     , wallets=wallet0:_wallet1:_
     , configurationFile
-    } <- cardanoTestnet fastTestnetOptions conf
+    } <- liftToIntegration r2 $ cardanoTestnet fastTestnetOptions conf
 
   poolNode1 <- H.headM testnetNodes
   poolSprocket1 <- H.noteShow $ nodeSprocket poolNode1

@@ -35,8 +35,8 @@ packages:
 -- Needed when cross compiling
 extra-packages: alex
 
-program-options
-  ghc-options: -Werror
+-- program-options
+--   ghc-options: -Werror
 
 test-show-details: direct
 

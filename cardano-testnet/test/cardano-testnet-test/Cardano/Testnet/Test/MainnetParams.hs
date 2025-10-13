@@ -9,6 +9,8 @@ module Cardano.Testnet.Test.MainnetParams
 
 import           Cardano.Testnet
 
+import           Control.Monad.Trans.Class (lift)
+import           Control.Monad.Trans.Resource (getInternalState)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Lens as A
 import qualified Data.ByteString.Lazy.Char8 as B
@@ -17,6 +19,7 @@ import           Lens.Micro ((^?))
 
 import           Testnet.Process.Run (execCli', mkExecConfig)
 import           Testnet.Property.Util (integrationRetryWorkspace)
+import           Testnet.Start.Cardano (liftToIntegration)
 import           Testnet.Start.Types (CreateEnvOptions (..), GenesisOptions (..),
                    UserProvidedEnv (..), TestnetOnChainParams (..))
 
@@ -38,14 +41,16 @@ hprop_mainnet_params = integrationRetryWorkspace 2 "mainnet-params" $ \tmpDir ->
 
   -- Generate the sandbox
   conf <- mkConf tmpDir
-  createTestnetEnv
+  r <- lift $ lift getInternalState 
+  liftToIntegration r $ createTestnetEnv
     testnetOptions genesisOptions createEnvOptions conf
 
   -- Run testnet with mainnet on-chain params
+  r1 <- lift $ lift getInternalState 
   TestnetRuntime
     { testnetNodes
     , testnetMagic
-    } <- cardanoTestnet testnetOptions conf
+    } <- liftToIntegration r1 $ cardanoTestnet testnetOptions conf
 
   -- Get a running node
   TestnetNode{nodeSprocket} <- H.headM testnetNodes

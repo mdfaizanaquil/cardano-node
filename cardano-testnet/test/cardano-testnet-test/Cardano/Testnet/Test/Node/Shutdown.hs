@@ -13,12 +13,12 @@ module Cardano.Testnet.Test.Node.Shutdown
 import           Cardano.Api
 
 import           Cardano.Testnet
-import qualified Cardano.Testnet as Testnet
 
 import           Prelude
 
 import           Control.Applicative (Alternative ((<|>)))
 import           Control.Monad
+import           Control.Monad.Trans.Resource (getInternalState)
 import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -36,11 +36,12 @@ import qualified System.IO as IO
 import qualified System.Process as IO
 import           System.Process (interruptProcessGroupOf)
 
-import           Testnet.Components.Configuration
+import qualified Testnet.Components.Configuration as Testnet
 import           Testnet.Defaults
 import           Testnet.Process.Run (execCli_, initiateProcess, procNode)
 import           Testnet.Property.Util (integrationRetryWorkspace)
 import           Testnet.Start.Byron
+import           Testnet.Start.Cardano
 import           Testnet.Start.Types
 
 import           Hedgehog (Property, (===))
@@ -106,8 +107,9 @@ hprop_shutdown = integrationRetryWorkspace 2 "shutdown" $ \tempAbsBasePath' -> H
 
   -- 2. Create Alonzo genesis
   alonzoBabbageTestGenesisJsonTargetFile <- H.noteShow $ tempAbsPath' </> shelleyDir </> "genesis.alonzo.spec.json"
-  gen <- Testnet.getDefaultAlonzoGenesis sbe
-  H.evalIO $ LBS.writeFile alonzoBabbageTestGenesisJsonTargetFile $ encode gen
+  r1 <- lift $ lift getInternalState 
+  gen <- liftToIntegration r1 $ Testnet.getDefaultAlonzoGenesis sbe
+  liftIO $ LBS.writeFile alonzoBabbageTestGenesisJsonTargetFile $ encode gen
 
   -- 2. Create Conway genesis
   conwayBabbageTestGenesisJsonTargetFile <- H.noteShow $ tempAbsPath' </> shelleyDir </> "genesis.conway.spec.json"
@@ -121,16 +123,24 @@ hprop_shutdown = integrationRetryWorkspace 2 "shutdown" $ \tempAbsBasePath' -> H
     , "--start-time", formatIso8601 startTime
     ]
 
-  byronGenesisHash <- getByronGenesisHash $ byronGenesisOutputDir </> "genesis.json"
+  r2 <- lift $ lift getInternalState 
+  byronGenesisHash <- liftToIntegration r2 $
+                        Testnet.getByronGenesisHash $ byronGenesisOutputDir </> "genesis.json"
+
   -- Move the files to the paths expected by 'defaultYamlHardforkViaConfig' below
   H.renameFile (byronGenesisOutputDir </> "genesis.json") (tempAbsPath' </> defaultGenesisFilepath ByronEra)
   H.renameFile (tempAbsPath' </> "shelley/genesis.json")        (tempAbsPath' </> defaultGenesisFilepath ShelleyEra)
   H.renameFile (tempAbsPath' </> "shelley/genesis.alonzo.json") (tempAbsPath' </> defaultGenesisFilepath AlonzoEra)
   H.renameFile (tempAbsPath' </> "shelley/genesis.conway.json") (tempAbsPath' </> defaultGenesisFilepath ConwayEra)
 
-  shelleyGenesisHash <- getShelleyGenesisHash (tempAbsPath' </> defaultGenesisFilepath ShelleyEra) "ShelleyGenesisHash"
-  alonzoGenesisHash  <- getShelleyGenesisHash (tempAbsPath' </> defaultGenesisFilepath AlonzoEra)  "AlonzoGenesisHash"
 
+  r3 <- lift $ lift getInternalState 
+  (shelleyGenesisHash,alonzoGenesisHash)  <- 
+    liftToIntegration r3 $ do  
+      shelleyGenesisHash <- Testnet.getShelleyGenesisHash (tempAbsPath' </> defaultGenesisFilepath ShelleyEra) "ShelleyGenesisHash"
+      alonzoGenesisHash  <- Testnet.getShelleyGenesisHash (tempAbsPath' </> defaultGenesisFilepath AlonzoEra)  "AlonzoGenesisHash"
+      return (shelleyGenesisHash, alonzoGenesisHash)
+      
   let finalYamlConfig :: LBS.ByteString
       finalYamlConfig = encode . Object
                                  $ mconcat [ byronGenesisHash
@@ -164,7 +174,7 @@ hprop_shutdown = integrationRetryWorkspace 2 "shutdown" $ \tempAbsBasePath' -> H
   eProcess <- runExceptT $ initiateProcess process
   case eProcess of
     Left e -> H.failMessage GHC.callStack $ mconcat ["Failed to initiate node process: ", show e]
-    Right (mStdin, _mStdout, _mStderr, pHandle, _releaseKey) -> do
+    Right (mStdin, _mStdout, _mStderr, pHandle, _) -> do
       H.threadDelay $ 10 * 1000000
 
       mExitCodeRunning <- H.evalIO $ IO.getProcessExitCode pHandle

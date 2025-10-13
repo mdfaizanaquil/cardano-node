@@ -86,6 +86,8 @@ library
                       , process
                       , resourcet
                       , retry
+                      , rio
+                      , rio-orphans
                       , safe-exceptions
                       , scientific
                       , si-timers
@@ -98,6 +100,7 @@ library
                       , time
                       , transformers
                       , transformers-except
+                      , unliftio-core
                       , vector
                       , yaml
 
@@ -111,17 +114,20 @@ library
                         Testnet.EpochStateProcessing
                         Testnet.Filepath
                         Testnet.Handlers
+                        Testnet.Orphans
                         Testnet.Ping
                         Testnet.Process.Cli.DRep
                         Testnet.Process.Cli.Keys
                         Testnet.Process.Cli.SPO
                         Testnet.Process.Cli.Transaction
+                        Testnet.Process.NewRun
                         Testnet.Process.Run
                         Testnet.Property.Assert
                         Testnet.Property.Run
                         Testnet.Property.Util
                         Testnet.Runtime
                         Testnet.Start.Byron
+                        Testnet.Start.Cardano
                         Testnet.Start.Types
                         Testnet.SubmitApi
                         Testnet.TestQueryCmds
@@ -130,7 +136,6 @@ library
   other-modules:        Parsers.Cardano
                         Parsers.Help
                         Parsers.Version
-                        Testnet.Start.Cardano
                         Testnet.TestEnumGenerator
                         Paths_cardano_testnet
 
@@ -266,6 +271,7 @@ test-suite cardano-testnet-test
                       , mtl
                       , process
                       , regex-compat
+                      , resourcet
                       , rio
                       , tasty ^>= 1.5
                       , text

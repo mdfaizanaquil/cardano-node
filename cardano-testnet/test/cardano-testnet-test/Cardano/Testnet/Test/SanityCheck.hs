@@ -50,6 +50,7 @@ hprop_ledger_events_sanity_check = integrationRetryWorkspace 2 "ledger-events-sa
 
   TestnetRuntime{configurationFile, testnetNodes}
     <- createAndRunTestnet fastTestnetOptions shelleyOptions conf
+  -- error "Test failure" -- works
   nr@TestnetNode{nodeSprocket} <- H.headM testnetNodes
   let socketPath = nodeSocketPath nr
 
