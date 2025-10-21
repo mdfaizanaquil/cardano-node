@@ -224,7 +224,8 @@ createTestnetEnv
 -- > ├── configuration.json
 -- > ├── current-stake-pools.json
 -- > └── module
-cardanoTestnet :: HasCallStack
+cardanoTestnet 
+  :: HasCallStack
   => CardanoTestnetOptions -- ^ The options to use
   -> Conf -- ^ Path to the test sandbox
   -> RIO ResourceMap TestnetRuntime

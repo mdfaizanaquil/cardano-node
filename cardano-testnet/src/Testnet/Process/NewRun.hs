@@ -63,9 +63,10 @@ execCli' execConfig = GHC.withFrozenCallStack $ execFlex' execConfig "cardano-cl
 
 execCli_
   :: HasCallStack
+  => MonadIO m
   => [String]
-  -> RIO env ()
-execCli_ = GHC.withFrozenCallStack $ void . execCli
+  -> m ()
+execCli_ = GHC.withFrozenCallStack $ void . liftIO . runRIO () . execCli
 
 execCli
   :: HasCallStack

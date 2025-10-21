@@ -56,7 +56,7 @@ import           Data.Word (Word64)
 import           GHC.Stack (HasCallStack)
 import qualified GHC.Stack as GHC
 import qualified Network.HTTP.Simple as HTTP
-import           RIO (Exception(..), RIO, throwM)
+import           RIO (Exception(..), MonadThrow, throwM)
 import qualified System.Directory as System
 import           System.FilePath.Posix (takeDirectory, (</>))
 
@@ -74,9 +74,11 @@ import qualified Hedgehog.Extras.Stock.Time as DTC
 -- | Returns JSON encoded hashes of the era, as well as the hard fork configuration toggle.
 createConfigJson :: ()
   => HasCallStack
+  => MonadIO m
+  => MonadThrow m
   => TmpAbsolutePath
   -> ShelleyBasedEra era -- ^ The era used for generating the hard fork configuration toggle
-  -> RIO env (KeyMap Aeson.Value)
+  -> m (KeyMap Aeson.Value)
 createConfigJson (TmpAbsolutePath tempAbsPath) sbe = GHC.withFrozenCallStack $ do
   byronGenesisHash <- getByronGenesisHash $ tempAbsPath </> "byron-genesis.json"
   shelleyGenesisHash <- getHash ShelleyEra "ShelleyGenesisHash"
@@ -91,7 +93,7 @@ createConfigJson (TmpAbsolutePath tempAbsPath) sbe = GHC.withFrozenCallStack $ d
     , Defaults.defaultYamlHardforkViaConfig sbe
     ]
    where
-    getHash ::  CardanoEra a -> Text.Text -> RIO env (KeyMap Value)
+    getHash ::  MonadIO m => CardanoEra a -> Text.Text -> m (KeyMap Value)
     getHash e = getShelleyGenesisHash (tempAbsPath </> Defaults.defaultGenesisFilepath e)
 
 createConfigJsonNoHash :: ()
@@ -102,8 +104,10 @@ createConfigJsonNoHash = Defaults.defaultYamlHardforkViaConfig
 -- Generate hashes for genesis.json files
 
 getByronGenesisHash
-  :: FilePath
-  -> RIO env (KeyMap Aeson.Value)
+  :: MonadIO m
+  => MonadThrow m
+  => FilePath
+  -> m (KeyMap Aeson.Value)
 getByronGenesisHash path = do
   e <- runExceptT $ readGenesisData path
   case e of 
@@ -113,9 +117,10 @@ getByronGenesisHash path = do
       pure . singleton "ByronGenesisHash" $ toJSON genesisHash'
 
 getShelleyGenesisHash
-  :: FilePath
+  :: MonadIO m
+  => FilePath
   -> Text
-  -> RIO env (KeyMap Aeson.Value)
+  -> m (KeyMap Aeson.Value)
 getShelleyGenesisHash path key = do
   content <- liftIO $ BS.readFile path
   let genesisHash = Crypto.hashWith id content :: Crypto.Hash Crypto.Blake2b_256 BS.ByteString
@@ -128,10 +133,11 @@ startTimeOffsetSeconds = if OS.isWin32 then 90 else 15
 
 -- | A start time and 'ShelleyGenesis' value that are fit to pass to 'cardanoTestnet'
 getDefaultShelleyGenesis :: ()
+  => MonadIO m
   => AnyShelleyBasedEra
   -> Word64 -- ^ The max supply
   -> GenesisOptions
-  -> RIO env ShelleyGenesis
+  -> m ShelleyGenesis
 getDefaultShelleyGenesis asbe maxSupply opts = do
   currentTime <- liftIO DTC.getCurrentTime
   let startTime = DTC.addUTCTime startTimeOffsetSeconds currentTime
@@ -140,8 +146,9 @@ getDefaultShelleyGenesis asbe maxSupply opts = do
 -- | An 'AlonzoGenesis' value that is fit to pass to 'cardanoTestnet'
 getDefaultAlonzoGenesis :: ()
   => HasCallStack
+  => MonadThrow m
   => ShelleyBasedEra era
-  -> RIO e AlonzoGenesis
+  -> m AlonzoGenesis
 getDefaultAlonzoGenesis sbe =
   case Defaults.defaultAlonzoGenesis sbe of 
     Right genesis -> return genesis
@@ -161,11 +168,14 @@ numSeededUTxOKeys = 3
 -- for logging purposes. No reason for the annotations 
 -- to be littered within the functions 
 createSPOGenesisAndFiles
-  :: CardanoTestnetOptions -- ^ The options to use
+  :: MonadIO m
+  => HasCallStack
+  => MonadThrow m
+  => CardanoTestnetOptions -- ^ The options to use
   -> GenesisOptions
   -> TestnetOnChainParams
   -> TmpAbsolutePath
-  -> RIO env FilePath -- ^ Shelley genesis directory
+  -> m FilePath -- ^ Shelley genesis directory
 createSPOGenesisAndFiles
   testnetOptions genesisOptions@GenesisOptions{genesisTestnetMagic}
   onChainParams
@@ -310,9 +320,11 @@ instance Exception BlockfrostParamsError where
 -- into a unified, consistent set of Genesis files
 resolveOnChainParams :: ()
  => HasCallStack
+ => MonadIO m
+ => MonadThrow m
  => TestnetOnChainParams
  -> (AlonzoGenesis, ConwayGenesis, ShelleyGenesis)
- -> RIO env (AlonzoGenesis, ConwayGenesis, ShelleyGenesis)
+ -> m (AlonzoGenesis, ConwayGenesis, ShelleyGenesis)
 resolveOnChainParams onChainParams geneses = case onChainParams of
 
   DefaultParams -> pure geneses
