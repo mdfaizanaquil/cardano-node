@@ -25,7 +25,6 @@ module Testnet.Start.Cardano
   , retryOnAddressInUseError
     -- Move to my own module
   , liftToIntegration
-  , reconcileMaps
   ) where
 
 
@@ -44,17 +43,13 @@ import           Prelude hiding (lines)
 import           Control.Concurrent (threadDelay)
 import           Control.Exception (Exception (..))
 import           Control.Monad
-import           Control.Monad.Trans.Resource.Internal (ReleaseMap(..))
 import           Data.Aeson
 import qualified Data.Aeson.Encode.Pretty as A
 import qualified Data.Aeson.KeyMap as A
-import           Data.Acquire.Internal (ReleaseType)
 import qualified Data.ByteString.Lazy as LBS
 import           Data.Default.Class (def)
 import           Data.Either
 import           Data.Functor
-import           Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
 import           Data.MonoTraversable (Element, MonoFunctor, omap)
 import qualified Data.Text as Text
 import           Data.Time (diffUTCTime)
@@ -78,11 +73,10 @@ import qualified Hedgehog.Extras as H
 import qualified Hedgehog.Extras.Stock.IO.Network.Port as H
 
 
-import RIO (RIO(..),runRIO, IORef, readIORef, modifyIORef', throwM)
-import Control.Monad.Trans.Resource (ResourceT, getInternalState)
+import RIO (RIO(..),runRIO, throwM)
+import Control.Monad.Trans.Resource (getInternalState)
 import Testnet.Orphans ()
-import RIO.Orphans (HasResourceMap, withResourceMap)
-import Control.Monad.IO.Unlift
+import RIO.Orphans (ResourceMap)
 
 
 newtype MinimumConfigRequirementsError
@@ -101,100 +95,10 @@ testMinimumConfigurationRequirements options = withFrozenCallStack $ do
   when (cardanoNumPools options < 1) $ do
     throwM $ MinimumConfigRequirementsError "Need at least one SPO node to produce blocks, but got none."
 
-liftToIntegration :: IORef ReleaseMap -> RIO (IORef ReleaseMap) a -> H.Integration a 
-liftToIntegration m r = lift . lift $ updateRIOState m r
-
-
--- Why do we need to do this? What happens if an IO action fails
--- when running the RIO monad? We need to clean up everthing else.
--- TODO: Accomodate for the IntegrationState as well!
-updateRIOState
-  :: MonadUnliftIO m
-  => IORef ReleaseMap -- ^ External resource map
-  -> RIO (IORef ReleaseMap) a 
-  -> ResourceT m a
-updateRIOState externalResourceMap rioAction = 
-    withResourceMap 
-      (\rioActionResoureMap -> do 
-          liftIO $ appendResourceMap externalResourceMap rioActionResoureMap
-          updatedState <- getInternalState
-          runRIO updatedState rioAction
-      )
- where 
-  -- TODO: Figure out how to do this!
-  appendResourceMap :: IORef ReleaseMap -> IORef ReleaseMap -> IO ()
-  appendResourceMap externalMap internalMap = do
-    extMap <- readIORef externalMap 
-    intMap <- readIORef internalMap  
-    modifyIORef' internalMap $ const $ appendResourceMapPure extMap intMap  
-
-
-appendResourceMapPure :: ReleaseMap -> ReleaseMap -> ReleaseMap
-appendResourceMapPure (ReleaseMap _ rf1 m1) (ReleaseMap _ rf2 m2) = 
-    let finalMap = reconcileMaps m1 m2
-    in ReleaseMap (getNextKey finalMap) (rf1 + rf2) finalMap
-appendResourceMapPure _ _ = error "failed"
-
-{-
-createInternalState :: MonadIO m => m InternalState
-createInternalState = liftIO
-                    $ I.newIORef
-                    $ ReleaseMap maxBound (minBound + 1) IntMap.empty
-register' :: I.IORef ReleaseMap
-          -> IO ()
-          -> IO ReleaseKey
-register' istate rel = I.atomicModifyIORef istate $ \rm ->
-    case rm of
-        ReleaseMap key rf m ->
-            ( ReleaseMap (key - 1) rf (IntMap.insert key (const rel) m)
-            , ReleaseKey istate key
-            )
-        ReleaseMapClosed -> throw $ InvalidAccess "register'"
-
--}
-
-getNextKey :: IntMap (ReleaseType -> IO ()) -> Int
-getNextKey m = case IntMap.lookupMin m of 
-                Just (mini,_) -> mini - 1
-                Nothing -> maxBound
-
-reconcileMaps :: IntMap a-> IntMap a -> IntMap a
-reconcileMaps externalMap internalMap = 
-  let externalValues = IntMap.elems externalMap 
-      internalValues = IntMap.elems internalMap
-      finalValues = externalValues ++ internalValues
-  in IntMap.fromList $ zip (dec maxBound) finalValues
- where 
-   dec 0 = []
-   dec start = 
-     start : dec (start - 1)
-
--- TODO: Left off here
--- You are already decrementing the key. Therefore get the mod of each key
--- add them and then add the negative
--- The reference account appears to stay the same when registering actions
--- You need to generate the next key which is the negative of the sum of both keys plus 1 
--- You need to merge the maps. However you need to reassign the keys in the RIO internal map. 
--- You need to start from the most negative key in the external map and decrement it for each key in the internal 
--- RIO map. 
-
-
-{-
-register' :: I.IORef ReleaseMap
-          -> IO ()
-          -> IO ReleaseKey
-register' istate rel = I.atomicModifyIORef istate $ \rm ->
-    case rm of
-        ReleaseMap key rf m ->
-            -- First value in tuple is important 
-
-            ( ReleaseMap (key - 1) rf (IntMap.insert key (const rel) m)
-            , ReleaseKey istate key
-            )
-        ReleaseMapClosed -> throw $ InvalidAccess "register'"
-
--}
-
+liftToIntegration :: RIO ResourceMap a -> H.Integration a 
+liftToIntegration  r = do 
+   rMap <- lift $ lift getInternalState 
+   liftIO $ runRIO rMap r
 
 createTestnetEnv :: ()
   => HasCallStack
@@ -321,10 +225,9 @@ createTestnetEnv
 -- > ├── current-stake-pools.json
 -- > └── module
 cardanoTestnet :: HasCallStack
-  => HasResourceMap env
   => CardanoTestnetOptions -- ^ The options to use
   -> Conf -- ^ Path to the test sandbox
-  -> RIO env TestnetRuntime
+  -> RIO ResourceMap TestnetRuntime
 cardanoTestnet
   testnetOptions
   Conf
@@ -547,8 +450,7 @@ createAndRunTestnet :: ()
   -> Conf -- ^ Path to the test sandbox
   -> H.Integration TestnetRuntime
 createAndRunTestnet testnetOptions genesisOptions conf = do
-  r <- lift $ lift getInternalState 
-  liftToIntegration r $ do
+  liftToIntegration $ do
      -- works error "here"
      createTestnetEnv
        testnetOptions genesisOptions def

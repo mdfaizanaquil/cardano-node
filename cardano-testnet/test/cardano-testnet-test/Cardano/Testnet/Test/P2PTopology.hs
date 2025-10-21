@@ -13,8 +13,6 @@ import           Cardano.Testnet.Test.Utils (nodesProduceBlocks)
 
 import           Prelude
 
-import           Control.Monad.Trans.Class (lift)
-import           Control.Monad.Trans.Resource (getInternalState)
 import           Data.Default.Class (def)
 import           System.FilePath ((</>))
 
@@ -39,15 +37,13 @@ hprop_p2p_topology = integrationRetryWorkspace 2 "p2p-topology" $ \tmpDir -> H.r
 
   -- Generate the sandbox
   conf <- mkConf tmpDir
-  r1 <- lift $ lift getInternalState
-  liftToIntegration r1 $ createTestnetEnv testnetOptions genesisOptions createEnvOptions conf
+  liftToIntegration $ createTestnetEnv testnetOptions genesisOptions createEnvOptions conf
 
   -- Check that the topology is indeed P2P
   eTopology <- H.readJsonFile someTopologyFile
   (_topology :: P2P.NetworkTopology NodeId) <- H.leftFail eTopology
 
   -- Run testnet with generated config
-  r2 <- lift $ lift getInternalState
-  runtime <- liftToIntegration r2 $ cardanoTestnet testnetOptions conf
+  runtime <- liftToIntegration $ cardanoTestnet testnetOptions conf
 
   nodesProduceBlocks tmpDir runtime

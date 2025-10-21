@@ -17,8 +17,6 @@ import           Cardano.Testnet.Test.Utils (nodesProduceBlocks)
 
 import           Prelude
 
-import           Control.Monad.Trans.Class (lift)
-import           Control.Monad.Trans.Resource (getInternalState)
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import           Data.Default.Class (def)
 import qualified Data.Time.Clock as Time
@@ -48,8 +46,7 @@ hprop_dump_config = integrationRetryWorkspace 2 "dump-config-files" $ \tmpDir ->
   conf <- mkConf tmpDir
   -- TODO: Make this a standalone function for testing only
   -- see createAndRunTestnet
-  r1 <- lift $ lift getInternalState 
-  liftToIntegration r1 $ createTestnetEnv
+  liftToIntegration $ createTestnetEnv
     testnetOptions genesisOptions def
     -- Do not add hashes to the main config file, so that genesis files
     -- can be modified without having to recompute hashes every time.
@@ -75,7 +72,6 @@ hprop_dump_config = integrationRetryWorkspace 2 "dump-config-files" $ \tmpDir ->
   H.lbsWriteFile shelleyGenesisFile $ encodePretty shelleyGenesis
 
   -- Run testnet with generated config
-  r2 <- lift $ lift getInternalState 
-  runtime <- liftToIntegration r2 $ cardanoTestnet testnetOptions conf
+  runtime <- liftToIntegration $ cardanoTestnet testnetOptions conf
 
   nodesProduceBlocks tmpDir runtime

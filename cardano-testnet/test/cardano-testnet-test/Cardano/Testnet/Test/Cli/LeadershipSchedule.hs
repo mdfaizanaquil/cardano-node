@@ -22,7 +22,6 @@ import           Cardano.Testnet
 import           Prelude
 
 import           Control.Monad (void)
-import           Control.Monad.Trans.Resource (getInternalState)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson as J
 import qualified Data.Aeson.Encode.Pretty as Aeson
@@ -258,8 +257,7 @@ hprop_leadershipSchedule = integrationRetryWorkspace 2 "leadership-schedule" $ \
       , "--operational-certificate-issue-counter-file", testSpoOperationalCertFp
       , "--out-file", testSpoOperationalCertFp
       ]
-  r1 <- lift $ lift getInternalState 
-  jsonBS <- liftToIntegration r1 $
+  jsonBS <- liftToIntegration $
     Aeson.encodePretty . Aeson.Object <$> createConfigJson tempAbsPath sbe
   H.lbsWriteFile (unFile configurationFile) jsonBS
   newNodePort <- H.randomPort testnetDefaultIpv4Address

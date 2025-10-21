@@ -22,6 +22,7 @@ import           Prelude
 
 import           Control.Monad
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Encode.Pretty as Aeson
 import qualified Data.Aeson as J
 import           Data.Default.Class
 import           Data.Function
@@ -49,6 +50,7 @@ import qualified Hedgehog.Extras.Stock.IO.Network.Sprocket as IO
 import qualified Hedgehog.Extras.Test.Base as H
 import qualified Hedgehog.Extras.Test.File as H
 import qualified Hedgehog.Extras.Test.TestWatchdog as H
+import Testnet.Start.Cardano (liftToIntegration)
 
 
 -- | Execute me with:
@@ -254,7 +256,7 @@ hprop_kes_period_info = integrationRetryWorkspace 2 "kes-period-info" $ \tempAbs
       , "--out-file", testSpoOperationalCertFp
       ]
 
-  jsonBS <- undefined -- Aeson.encodePretty . Aeson.Object <$> createConfigJson tempAbsPath sbe
+  jsonBS <- liftToIntegration $ Aeson.encodePretty . Aeson.Object <$> createConfigJson tempAbsPath sbe
   H.lbsWriteFile (unFile configurationFile) jsonBS
   newNodePortNumber <- H.randomPort testnetDefaultIpv4Address
   eRuntime <- runExceptT . retryOnAddressInUseError $

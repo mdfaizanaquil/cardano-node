@@ -18,7 +18,6 @@ import           Prelude
 
 import           Control.Applicative (Alternative ((<|>)))
 import           Control.Monad
-import           Control.Monad.Trans.Resource (getInternalState)
 import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -107,8 +106,7 @@ hprop_shutdown = integrationRetryWorkspace 2 "shutdown" $ \tempAbsBasePath' -> H
 
   -- 2. Create Alonzo genesis
   alonzoBabbageTestGenesisJsonTargetFile <- H.noteShow $ tempAbsPath' </> shelleyDir </> "genesis.alonzo.spec.json"
-  r1 <- lift $ lift getInternalState 
-  gen <- liftToIntegration r1 $ Testnet.getDefaultAlonzoGenesis sbe
+  gen <- liftToIntegration $ Testnet.getDefaultAlonzoGenesis sbe
   liftIO $ LBS.writeFile alonzoBabbageTestGenesisJsonTargetFile $ encode gen
 
   -- 2. Create Conway genesis
@@ -123,8 +121,7 @@ hprop_shutdown = integrationRetryWorkspace 2 "shutdown" $ \tempAbsBasePath' -> H
     , "--start-time", formatIso8601 startTime
     ]
 
-  r2 <- lift $ lift getInternalState 
-  byronGenesisHash <- liftToIntegration r2 $
+  byronGenesisHash <- liftToIntegration $
                         Testnet.getByronGenesisHash $ byronGenesisOutputDir </> "genesis.json"
 
   -- Move the files to the paths expected by 'defaultYamlHardforkViaConfig' below
@@ -133,10 +130,8 @@ hprop_shutdown = integrationRetryWorkspace 2 "shutdown" $ \tempAbsBasePath' -> H
   H.renameFile (tempAbsPath' </> "shelley/genesis.alonzo.json") (tempAbsPath' </> defaultGenesisFilepath AlonzoEra)
   H.renameFile (tempAbsPath' </> "shelley/genesis.conway.json") (tempAbsPath' </> defaultGenesisFilepath ConwayEra)
 
-
-  r3 <- lift $ lift getInternalState 
   (shelleyGenesisHash,alonzoGenesisHash)  <- 
-    liftToIntegration r3 $ do  
+    liftToIntegration $ do  
       shelleyGenesisHash <- Testnet.getShelleyGenesisHash (tempAbsPath' </> defaultGenesisFilepath ShelleyEra) "ShelleyGenesisHash"
       alonzoGenesisHash  <- Testnet.getShelleyGenesisHash (tempAbsPath' </> defaultGenesisFilepath AlonzoEra)  "AlonzoGenesisHash"
       return (shelleyGenesisHash, alonzoGenesisHash)

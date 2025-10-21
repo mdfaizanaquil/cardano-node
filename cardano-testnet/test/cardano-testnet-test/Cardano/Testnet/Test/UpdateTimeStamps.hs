@@ -12,8 +12,6 @@ import           Cardano.Testnet.Test.Utils (nodesProduceBlocks)
 
 import           Prelude
 
-import           Control.Monad.Trans.Class (lift)
-import           Control.Monad.Trans.Resource (getInternalState)
 import           Data.Default.Class (def)
 import           GHC.Float (double2Int)
 
@@ -37,8 +35,7 @@ hprop_update_time_stamps = integrationRetryWorkspace 2 "update-time-stamps" $ \t
 
   -- Generate the sandbox
   conf <- mkConf tmpDir
-  r1 <- lift $ lift getInternalState
-  liftToIntegration r1 $ createTestnetEnv
+  liftToIntegration $ createTestnetEnv
     testnetOptions genesisOptions def
     -- Do not add hashes to the main config file, so that genesis files
     -- can be modified without having to recompute hashes every time.
@@ -49,7 +46,6 @@ hprop_update_time_stamps = integrationRetryWorkspace 2 "update-time-stamps" $ \t
   H.threadDelay $ double2Int $ realToFrac startTimeOffsetSeconds * 1_000_000 * 1.2
 
   -- Run testnet and specify to update time stamps before starting
-  r2 <- lift $ lift getInternalState
-  runtime <- liftToIntegration r2 $ cardanoTestnet testnetOptions conf{updateTimestamps = UpdateTimestamps}
+  runtime <- liftToIntegration $ cardanoTestnet testnetOptions conf{updateTimestamps = UpdateTimestamps}
 
   nodesProduceBlocks tmpDir runtime

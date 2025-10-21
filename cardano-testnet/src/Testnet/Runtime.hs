@@ -147,7 +147,6 @@ startNode tp node ipv4 port _testnetMagic nodeCmd = GHC.withFrozenCallStack $ do
                              , "--port", show port
                              , "--host-addr", showIpv4Address ipv4
                              ]
-    -- error "startNode 1" -- works
     nodeProcess <- newExceptT . fmap (first ExecutableRelatedFailure) . try $ runRIO () $ procNode completeNodeCmd
 
     -- The port number if it is obtained using 'H.randomPort', it is firstly bound to and then closed. The closing
@@ -176,7 +175,7 @@ startNode tp node ipv4 port _testnetMagic nodeCmd = GHC.withFrozenCallStack $ do
 
     -- We then log the pid in the temp dir structure.
     liftIO $ IO.writeFile nodePidFile $ show pid
-   -- error "pre eSprocketError " -- THIS FAILS DIAGNOSE THIS
+
     -- Wait for socket to be created
     eSprocketError <-
       liftIO $
@@ -184,7 +183,7 @@ startNode tp node ipv4 port _testnetMagic nodeCmd = GHC.withFrozenCallStack $ do
           60  -- timeout
           0.2 -- check interval
           sprocket
-    -- error $ "startNode 2:" <> show eSprocketError -- Works! after replacing bracket
+
     -- If we do have anything on stderr, fail.
     stdErrContents <- liftIO $ IO.readFile nodeStderrFile
     unless (null stdErrContents) $

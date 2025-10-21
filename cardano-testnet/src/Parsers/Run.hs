@@ -11,8 +11,6 @@ module Parsers.Run
 
 import           Cardano.CLI.Environment
 import           Control.Monad
-import           Control.Monad.Trans.Class (lift)
-import           Control.Monad.Trans.Resource (getInternalState)
 
 import           Data.Default.Class (def)
 import           Data.Foldable
@@ -65,8 +63,7 @@ createEnvOptions CardanoTestnetCreateEnvOptions
   , createEnvCreateEnvOptions=ceOptions
   } =
     testnetRoutine (UserProvidedEnv outputDir) $ \conf -> do 
-      r <- lift $ lift getInternalState 
-      liftToIntegration r $
+      liftToIntegration $
         createTestnetEnv
           testnetOptions genesisOptions ceOptions
           -- Do not add hashes to the main config file, so that genesis files
